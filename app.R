@@ -7,7 +7,7 @@
 #########################################################################################
 
 # shiny::runApp(system.file("shiny", package = "visNetwork"))
-# setwd("Desktop/ANALYSIS/shiny_network_app/")
+# setwd("~/Desktop/ANALYSIS/shiny_network_app/")
 
 library(shiny) # runExample("01_hello")
 library(igraph)
@@ -66,7 +66,7 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
   #      ')
   # ),
   
-  navbarPage(title="From comorbidities to Gene Expression Fingerprints and back", #theme=shinytheme("flatly"),   # flatly, lumen
+  navbarPage(title="Patient stratification reveals the molecular basis of disease comorbidities", #theme=shinytheme("flatly"),   # flatly, lumen
              tabPanel("Networks",   # NETWORKS SECTION
                       sidebarLayout(
                         sidebarPanel(
@@ -87,7 +87,12 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
                                                  "Greedy modularity optimization algorithm" = "greedy",
                                                  "Random walks" = "rand_walks")),  #walktrap
                           selectInput("filt_network_node", "Filter by disease(s)", sort(meta$final_disease_name), multiple=TRUE),
-                          textOutput("net_choicePlot")
+                          # uiOutput("select_int_type"),
+                          conditionalPanel(
+                            condition = "input.net_choice == 'final_metap_dis_pairwise_union_spearman_distance_sDEGs_network.txt'",
+                            checkboxGroupInput("select_interact_type", "Select interactions:", c("Disease-Disease" = "DD", "Disease-Metap"="DM", "Metap-Metap"="MM"))
+                          )
+                          # textOutput("txt")
                         ),
                         mainPanel(
                           width = 10,
@@ -198,7 +203,7 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
                         )
              ),
              tabPanel("Documentation",      # DOCUMENTATION SECTION
-                      h2("From comorbidities to Gene Expression Fingerprints and back", align="left"),
+                      h2("Patient stratification reveals the molecular basis of disease comorbidities", align="left"),
                       h4("Beatriz Urda-García, Jon Sánchez-Valle, Rosalba Lepore and Alfonso Valencia", align="left"),
                       br(),
                       # column(width=3, offset = 0, aligh="left",
@@ -314,15 +319,18 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
                             onmouseover="this.style.opacity=0.6;this.filters.alpha.opacity=60",
                             width = 2,align = "center",height = 2)
                       )
-                    )),      # AUTHORS SECTION
+                    )), 
 
 )
 
 server <- function(input, output) {
   
+  
   # output$txt <- renderText({
-  #   paste(input$current_node_id,"-",input$net_plot_selected)
+  #   paste0("hi",input$select_interact_type, length(input$select_interact_type))
+  #   # print(df[1:7, ])
   # })
+  # 
   
   # output$txt <- renderUI({
   #   HTML(paste('<b>','Highlight node:','</b>'))
@@ -353,6 +361,7 @@ server <- function(input, output) {
   
   output$net_plot <- renderVisNetwork({
     df <- read.csv(input$net_choice,header=T, sep="\t",stringsAsFactors = F)
+    df$Dis1 <- str_trim(df$Dis1); df$Dis2 <- str_trim(df$Dis2)
     if(input$pos_neg_interactions == 'pos'){
       # Selecting only positive interactions
       df <- df[df$Distance >= 0,]
@@ -362,7 +371,18 @@ server <- function(input, output) {
       # df$Distance <- abs(df$Distance)
     }
     df <- df[((abs(df$Distance) >= input$corr_slider[1]) & (abs(df$Distance) <= input$corr_slider[2])), ]
-    # p(input$net_plot_selected)
+    
+    if(input$net_choice == "final_metap_dis_pairwise_union_spearman_distance_sDEGs_network.txt" & !is.null(input$select_interact_type)){
+      if(!("DD" %in% input$select_interact_type)){ # remove interactions between diseases: only keep interaction in which at least 1 iteraction is a meta-patient
+        df <- df[(df$Dis1 != df$Corr_Dis1) | (df$Dis2 != df$Corr_Dis2), ] # at least one is a meta-pacient
+      }
+      if(!("MM" %in% input$select_interact_type)){
+        df <- df[(df$Dis1 == df$Corr_Dis1) | (df$Dis2 == df$Corr_Dis2), ] # at least one is a disease
+      }
+      if(!("DM" %in% input$select_interact_type)){
+        df <- df[(((df$Dis1 == df$Corr_Dis1) & (df$Dis2 == df$Corr_Dis2)) | ((df$Dis1 != df$Corr_Dis1) & (df$Dis2 != df$Corr_Dis2))), ] # keep dd o mm
+      }
+    }
     if(!is.null(input$filt_network_node)){
       if(input$net_choice == "final_pairwise_union_spearman_distance_sDEGs_network.txt"){
         df <- df[(df$Dis1 %in% input$filt_network_node | df$Dis2 %in% input$filt_network_node),]
@@ -458,6 +478,7 @@ server <- function(input, output) {
   # PRO TABLE
   output$net_dt_table <- renderDT({
     df <- read.csv(input$net_choice,header=T, sep="\t",stringsAsFactors = F)
+    df$Dis1 <- str_trim(df$Dis1); df$Dis2 <- str_trim(df$Dis2)
     if(input$pos_neg_interactions == 'pos'){ # POS / NEG INTERACTIONS
       # Selecting only positive interactions
       df <- df[df$Distance >= 0,]
@@ -471,6 +492,19 @@ server <- function(input, output) {
         df <- df[(df$Dis1 %in% input$filt_network_node | df$Dis2 %in% input$filt_network_node),]
       }else{
         df <- df[(df$Corr_Dis1 %in% input$filt_network_node | df$Corr_Dis2 %in% input$filt_network_node),]
+      }
+    }
+    # Filtering by DD, DM, MM
+    if(input$net_choice == "final_metap_dis_pairwise_union_spearman_distance_sDEGs_network.txt" & !is.null(input$select_interact_type)){
+      if(!("DD" %in% input$select_interact_type)){ # remove interactions between diseases: only keep interaction in which at least 1 iteraction is a meta-patient
+        # df <- df[df$Dis1 == "Breast cancer", ] # al menos alguna es un meta-paciente
+        df <- df[(df$Dis1 != df$Corr_Dis1) | (df$Dis2 != df$Corr_Dis2), ] # al menos alguna es un meta-paciente
+      }
+      if(!("MM" %in% input$select_interact_type)){
+        df <- df[(df$Dis1 == df$Corr_Dis1) | (df$Dis2 == df$Corr_Dis2), ] # al menos uno de ellos es una enfermedad
+      }
+      if(!("DM" %in% input$select_interact_type)){
+        df <- df[(((df$Dis1 == df$Corr_Dis1) & (df$Dis2 == df$Corr_Dis2)) | ((df$Dis1 != df$Corr_Dis1) & (df$Dis2 != df$Corr_Dis2))), ] # quedarme con las que son dd o mm
       }
     }
     # if(!is.null(input$filt_network_node)){
@@ -511,10 +545,15 @@ server <- function(input, output) {
         }else if(input$granularity_direction == 'down'){
           df <- df[df$logFC < 0, ]
         }else{df}
+        if(dim(df)[1] == 0){
+          df <- df[NULL,]
+        }else{
+          df$adj.p.value = formatC(df$adj.p.value, format = "e", digits = 2)
+          df$logFC = round(df$logFC,3)
+          df
+        }
         
-        df$adj.p.value = formatC(df$adj.p.value, format = "e", digits = 2)
-        df$logFC = round(df$logFC,3)
-        df
+        
         
       }else{
         df <- read.csv(paste0("additional_data/FE/",old_dis_name,"_pathways.txt"),header=T, sep="\t",stringsAsFactors = F)
@@ -526,15 +565,26 @@ server <- function(input, output) {
         }else if(input$granularity_direction == 'down'){
           df <- df[df$NES < 0, ]
         }else{df}
-        df$NES = round(df$NES, 3)
-        df$FDR.q.val = formatC(df$FDR.q.val, format = "e", digits = 2)
-        df
+        if(dim(df)[1] == 0){
+          df <- df[NULL,]
+        }else{
+          df$NES = round(df$NES, 3)
+          df$FDR.q.val = formatC(df$FDR.q.val, format = "e", digits = 2)
+          df
+        }
+        
       }
       
     }else if(length(input$selected_node_genes) > 1){
       
     }
   })
+  
+  # output$select_int_type = renderUI({
+  #   if(input$net_choice == "final_metap_dis_pairwise_union_spearman_distance_sDEGs_network.txt"){
+  #     checkboxGroupInput("select_interact_type", "Select interactions:", c("Disease-Disease" = "DD", "Disease-Metap"="DM", "Metap-Metap"="MM"))
+  #   }
+  # })
   
   output$common_genes_pathways <- renderDT({
     nsel_nodes = length(input$selected_node_genes)
