@@ -1,5 +1,5 @@
 # rgenexcom (RNA-seq Gene Expression Comorbidities)
-Web application for the manuscript **Patient stratification reveals the molecular basis of disease comorbidities**.
+Web application for the manuscript [**Patient stratification reveals the molecular basis of disease comorbidities**]("http://disease-perception.bsc.es/rgenexcom/").
 
 <!-- PROJECT SHIELDS -->
 <!--
