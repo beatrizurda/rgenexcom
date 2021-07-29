@@ -1,5 +1,5 @@
 # rgenexcom (RNA-seq Gene Expression Comorbidities)
-Web application for the manuscript [Patient stratification reveals the molecular basis of disease comorbidities]("http://disease-perception.bsc.es/rgenexcom/").
+Web application for the manuscript <a href="https://doi.org/10.1101/2021.07.22.21260979"><br>Patient stratification reveals the molecular basis of disease comorbidities</br></a>
 
 <!-- PROJECT SHIELDS -->
 <!--
@@ -34,7 +34,7 @@ rgenexcom is a web application that allows for both detailed studies on the mole
 
 ## Paper
 
-The manuscript is already available in MedRxiv [https://doi.org/10.1101/2021.07.22.21260979 ](https://doi.org/10.1101/2021.07.22.21260979 )
+The manuscript is already available in MedRxiv [https://doi.org/10.1101/2021.07.22.21260979](https://doi.org/10.1101/2021.07.22.21260979 )
 
 ### Abstract
 Epidemiological evidence shows that some diseases tend to co-occur; more exactly, certain groups of patients with a given disease are at a higher risk of developing a specific secondary condition. Despite the considerable interest, only a small number of connections between comorbidities and molecular processes have been identified.
