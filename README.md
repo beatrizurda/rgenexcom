@@ -27,9 +27,12 @@ Web application for the manuscript <a href="https://doi.org/10.1101/2021.07.22.2
 
 
 <!-- ABOUT THE PROJECT -->
-Web application: <a href="http://disease-perception.bsc.es/rgenexcom/">http://disease-perception.bsc.es/rgenexcom/</a>
-
+## Web Application
 rgenexcom is a web application that allows for both detailed studies on the molecular mechanisms underlying specific comorbidities and large-scale studies on the molecular basis of comorbidities. 
+
+Link to rgenexcom: <a href="http://disease-perception.bsc.es/rgenexcom/">http://disease-perception.bsc.es/rgenexcom/</a>
+
+![Captura de pantalla 2021-07-29 a las 17 20 21](https://user-images.githubusercontent.com/46993728/127520385-61bf4b87-7910-4069-babe-4c7557e39a11.png)
 
 
 ## Paper
