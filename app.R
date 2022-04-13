@@ -19,6 +19,8 @@ library(stringr)
 library(shinydashboard)
 library("shinydashboardPlus")
 library(shinythemes)
+# library(BiocManager)
+# options(repos = BiocManager::repositories())
 
 # To share the library
 library(rsconnect)
@@ -48,6 +50,12 @@ reactome_cats <- reactome_cats[!reactome_cats == "Digestion and absorption"]   #
 diseases_dic <- readRDS("disease_dic.rds")
 extended_node_names <- read.csv("additional_data/extended_node_names.txt",header=T, sep="\t",stringsAsFactors = F); dim(extended_node_names)
 
+genesdf <- read.csv("additional_data/gene_list_df.txt",header=T, sep="\t",stringsAsFactors = F); dim(genesdf)
+pathwaysdf <- read.csv("additional_data/pcats.txt",header=T, sep="\t",stringsAsFactors = F); dim(genesdf)
+all_pathways = sort(readRDS("additional_data/all_pathways.rds"))
+
+dsn_dic = readRDS("additional_data/DSN_genes_pathways_dics.rds")
+ssn_dic = readRDS("additional_data/SSN_genes_pathways_dics.rds")
 
 # User Interface, generates the html
 ui <- fluidPage(   # makes it responsible to different web browser windows dimensions
@@ -81,17 +89,45 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
                           # radioButtons("pos_neg_interactions", "Select interactions:",
                           #              choices=c("Positive" = "pos",
                           #                        "Negative" = "neg")),
-                          sliderInput("corr_slider","Edge's weight (|Spearman's correlation|):",min=0, max=1, value=c(0,1)),
+                          sliderInput("corr_slider","Edge's weight*:",min=0, max=1, value=c(0,1)),
+                          p("*|Spearman's correlation|"),
                           radioButtons("comm_algorithm", "Color by:",
                                        choices=c("ICD9 category" = "ICD9",
                                                  "Greedy modularity optimization algorithm" = "greedy",
                                                  "Random walks" = "rand_walks")),  #walktrap
-                          selectInput("filt_network_node", "Filter by disease(s)", sort(meta$final_disease_name), multiple=TRUE),
-                          # uiOutput("select_int_type"),
+                          selectInput("filt_backbone", "Network backbone:", c("","Metric", "Ultra-metric"), multiple=FALSE),
+                          selectInput("filt_network_node", "Filter by diseases:", sort(meta$final_disease_name), multiple=TRUE),
                           conditionalPanel(
                             condition = "input.net_choice == 'final_metap_dis_pairwise_union_spearman_distance_sDEGs_network.txt'",
                             checkboxGroupInput("select_interact_type", "Select interactions:", c("Disease-Disease" = "DD", "Disease-Metap"="DM", "Metap-Metap"="MM"))
-                          )
+                          ),
+                          selectizeInput('filt_network_genes', "Filter by genes:", choices = NULL, multiple = TRUE),
+                          tagList(
+                            selectizeInput('filt_network_pathways', "Filter by pathways:", choices = NULL, multiple = TRUE),
+                            tags$style(    type='text/css', 
+                                           ".selectize-input { word-wrap: break-word;}
+                                                         .selectize-input { word-break: break-word;}
+                                                         .selectize-dropdown { word-wrap: break-word;}"
+                            )
+                          ),
+                          # selectizeInput('filt_network_pathways', "Filter by pathways:", choices = NULL, multiple = TRUE,
+                          #                tags$style(    type='text/css', 
+                          #                               ".selectize-input { word-wrap: break-word;}
+                          #                                .selectize-input { word-break: break-word;}
+                          #                                .selectize-dropdown { word-wrap: break-word;}"
+                          #                )),
+                          radioButtons("genespaths_direction", "Direction of genes & pathways: ",
+                                       choices=c("All commonly / oppositively altered" = "all",
+                                                 "Up-Up / Up-Down" = "up",
+                                                 "Down-Dow / Down-Up" = "down")),
+                          p("Disease 1 - Disease 2"),
+                          p("Positive / Negative interactions")
+                          # p("Considers genes and pathways significantly altered.")
+                          # p("All: show all interactions that share the significant alteration of the selected genes and pathways (in the same direction for + interactions and in the opposite direction for - ones) ."),
+                          # p("Up: show only up-up for + interactions and up-down for - interactions."),
+                          # p("Down: show only down-down for + interactions and down-up for - interactions.")
+                          # uiOutput("select_int_type"),
+                          
                           # textOutput("txt")
                         ),
                         mainPanel(
@@ -252,7 +288,11 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
                       #        tags$li("If you only select two or more phenotypes, you will get the genes or pathways
                       # that are significantly altered in all those phenotypes. Again, you can select only the over or the underexpressed features.")
                       # ),
-                      
+                      h4("Tutorial", align="left"),
+                      h5("Download the tutorial of the web application (", align="left", style="display: inline"),
+                      tags$a("tutorial", href="rgenexcom_tutorial.pdf", style="display: inline"), 
+                      h5(")", style="display: inline"),
+                      br(),br(),
                       # h3("Networks", align="left"),
                       h4("Disease Similarity Network (DSN)", align="left"),
                       h5("First, we implemented an RNA-seq pipeline to perform Differential Expression Analysis for each disease.
@@ -273,6 +313,18 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
                          (following the same methodology described for the DSN). The resulting Stratified Similarity Network (SSN) contains three 
                          types of interactions: (1) the previously described disease-disease interactions, (2) interactions connecting different 
                          meta-patients and (3) interactions connecting meta-patients to diseases."),
+                      br(),
+                      h4("Network visualization", align="left"),
+                      h5("The user can select the network (DSN or SSN) and interactions of interest (all, positive or negative interactions).
+                      A threshold for the edge's weight (the absolute value of the Spearman's correlation) can also be applied.
+                      By default, nodes are colored based on their International Code of Diseases 9 (ICD9) category. Moreover, community detection algorithms
+                         (greedy modularity optimization and random walks) can be computed. The DSN and SSN backbones can be extracted based on the metric
+                         or ultra-metric closure, following Simas et al method."),
+                      h5("Nodes can also be highlighted within the network and the interactions entailing specific nodes (diseases and or meta-patients), genes and pathways can be selected.
+                         Genes are represented with ensemble ids and REACTOME, KEGG and GO pathways are available. When selecting genes and pathways,
+                         positive interactions that share the alteration of such genes or pathways in the same / opposite direction will be shown for positive / negative interactions
+                         respectively. The user can also select only the interactions that are commonly up or downregulated for positive interactions or up-down and down-up for
+                         negative interactions. In the later cases, the table will clarify which diseases have the gene or pathways up vs down (Disease 1 - Disease 2)."),
                       br(),
                       # h3("Molecular mechanisms", align="left"),
                       h4("Molecular mechanism behind diseases", align="left"),
@@ -323,7 +375,7 @@ ui <- fluidPage(   # makes it responsible to different web browser windows dimen
 
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   
   # output$txt <- renderText({
@@ -337,6 +389,18 @@ server <- function(input, output) {
   #   # paste(input$current_node_id,"-",input$net_plot_selected)
   # })
   
+  # Server-side selectize
+  # observeEvent(input$filt_network_genes, {
+  #   updateSelectizeInput(session, 'filt_network_genes', choices = genesdf$ensemble, server = TRUE)
+  # })
+  # observeEvent(input$filt_network_pathways, {
+  #   updateSelectizeInput(session, 'filt_network_pathways', choices = genesdf$ensemble, server = TRUE)
+  # })
+  
+  updateSelectizeInput(session, 'filt_network_genes', choices = genesdf$ensemble, server = TRUE, selected = NULL)
+  updateSelectizeInput(session, 'filt_network_pathways', choices = all_pathways, server = TRUE, selected = NULL)
+  # updateSelectizeInput(session, 'filt_network_pathways', choices = pathwaysdf$pathway, server = TRUE, selected = NULL)
+   
   output$fig_dis_fe <- renderImage({
     cselection = tolower(gsub(" ", "_",input$reactome_cat_suppfig))
     cfilename = paste0("www/FE_dis/",cselection,".png")
@@ -361,6 +425,12 @@ server <- function(input, output) {
   
   output$net_plot <- renderVisNetwork({
     df <- read.csv(input$net_choice,header=T, sep="\t",stringsAsFactors = F)
+    if(input$net_choice == "final_pairwise_union_spearman_distance_sDEGs_network.txt"){
+      genespathsdic = readRDS("additional_data/DSN_genes_pathways_dics.rds")
+    }else{
+      genespathsdic = readRDS("additional_data/SSN_genes_pathways_dics.rds")
+    }
+    
     df$Dis1 <- str_trim(df$Dis1); df$Dis2 <- str_trim(df$Dis2)
     if(input$pos_neg_interactions == 'pos'){
       # Selecting only positive interactions
@@ -370,6 +440,13 @@ server <- function(input, output) {
       df <- df[df$Distance < 0,]
       # df$Distance <- abs(df$Distance)
     }
+    # Backbone
+    if(input$filt_backbone == 'Metric'){
+      df <- df[df$is_metric == TRUE,]
+    }else if(input$filt_backbone == 'Ultra-metric'){
+      df <- df[df$is_ultrametric == TRUE,]
+    }
+    
     df <- df[((abs(df$Distance) >= input$corr_slider[1]) & (abs(df$Distance) <= input$corr_slider[2])), ]
     
     if(input$net_choice == "final_metap_dis_pairwise_union_spearman_distance_sDEGs_network.txt" & !is.null(input$select_interact_type)){
@@ -391,78 +468,114 @@ server <- function(input, output) {
       }
     }
     
-    graph <- graph_from_data_frame(df, directed=FALSE)
-    # is_weighted(graph)
-    E(graph)$weight <- abs(df$Distance)  # Uncomment maybe
-    # E(graph)$lty <- df$lty
-
-    # is_weighted(graph)
-    #### Detect the communities and add the community as a vertex attribute
-    if(input$comm_algorithm == 'ICD9'){
-      # By ICD9 Code
-      if(input$net_choice == "final_pairwise_union_spearman_distance_sDEGs_network.txt"){
-        colors <- merge(data.frame(Dis=V(graph)$name), dis_colors, all.x = TRUE, all.y=FALSE)
-        colors = colors[match(V(graph)$name, colors$Dis), ]
+    # Filtering pairs based on selected genes and pathways
+    gene_pairs = c()
+    if(!is.null(input$filt_network_genes)){
+      for(gene in input$filt_network_genes){
+        if(input$genespaths_direction == "all"){
+          gene_pairs = append(gene_pairs, union(genespathsdic$genesdf[[gene]]$up, genespathsdic$genesdf[[gene]]$down))
+        }else if(input$genespaths_direction == 'up'){
+          gene_pairs = append(gene_pairs, genespathsdic$genesdf[[gene]]$up)
+        }else{  # down
+          gene_pairs = append(gene_pairs, genespathsdic$genesdf[[gene]]$down)
+        }
+      }
+    }
+    path_pairs = c()
+    if(!is.null(input$filt_network_pathways)){
+      for(path in input$filt_network_pathways){
+        if(input$genespaths_direction == "all"){
+          path_pairs = append(path_pairs, union(genespathsdic$pathwaysdf[[path]]$up, genespathsdic$pathwaysdf[[path]]$down))
+        }else if(input$genespaths_direction == 'up'){
+          path_pairs = append(path_pairs, genespathsdic$pathwaysdf[[path]]$up)
+        }else{  # down
+          path_pairs = append(path_pairs, genespathsdic$pathwaysdf[[path]]$down)
+        }
+      }
+    }
+    # Select the union of interactions in genes and pathways
+    if(!is.null(input$filt_network_genes) | !is.null(input$filt_network_pathways)){
+      selected_pairs = union(gene_pairs, path_pairs)
+      # print(selected_pairs)
+      df <- df[df$id %in% selected_pairs,]
+    }
+    
+    if(nrow(df) > 0){
+      graph <- graph_from_data_frame(df, directed=FALSE)
+      # is_weighted(graph)
+      E(graph)$weight <- abs(df$Distance)  # Uncomment maybe
+      # E(graph)$lty <- df$lty
+      
+      # is_weighted(graph)
+      #### Detect the communities and add the community as a vertex attribute
+      if(input$comm_algorithm == 'ICD9'){
+        # By ICD9 Code
+        if(input$net_choice == "final_pairwise_union_spearman_distance_sDEGs_network.txt"){
+          colors <- merge(data.frame(Dis=V(graph)$name), dis_colors, all.x = TRUE, all.y=FALSE)
+          colors = colors[match(V(graph)$name, colors$Dis), ]
+        }else{
+          dis_order <- str_trim(gsub(" \\d+","",V(graph)$name))
+          colors <- merge(data.frame(Dis=dis_order), dis_colors, all.x = TRUE, all.y=FALSE)
+          colors = colors[match(dis_order, colors$Dis), ]
+        }
+        
+        V(graph)$color <- as.character(colors$Color)
+        V(graph)$Dis_category <- as.character(colors$Dis_category)
+        nodes <- data.frame(id = V(graph)$name, title = V(graph)$name, color = V(graph)$color, group=V(graph)$Dis_category)
       }else{
-        dis_order <- str_trim(gsub(" \\d+","",V(graph)$name))
-        colors <- merge(data.frame(Dis=dis_order), dis_colors, all.x = TRUE, all.y=FALSE)
-        colors = colors[match(dis_order, colors$Dis), ]
+        # COMMUNITY DETECTION
+        if(input$comm_algorithm == 'greedy'){
+          # Using greedy optimization of modularity
+          fc <- fastgreedy.community(graph)
+          V(graph)$community <- fc$membership
+        }else if(input$comm_algorithm == 'rand_walks'){
+          # Using random walks
+          fc <- cluster_walktrap(graph)
+          V(graph)$community <- fc$membership #membership(fc)
+        }
+        # Visualize the communities
+        nodes <- data.frame(id = V(graph)$name, title = V(graph)$name, group = V(graph)$community)
+        nodes <- nodes[order(nodes$id, decreasing = F),]
+        
       }
       
-      V(graph)$color <- as.character(colors$Color)
-      V(graph)$Dis_category <- as.character(colors$Dis_category)
-      nodes <- data.frame(id = V(graph)$name, title = V(graph)$name, color = V(graph)$color, group=V(graph)$Dis_category)
-    }else{
-      # COMMUNITY DETECTION
-      if(input$comm_algorithm == 'greedy'){
-        # Using greedy optimization of modularity
-        fc <- fastgreedy.community(graph)
-        V(graph)$community <- fc$membership
-      }else if(input$comm_algorithm == 'rand_walks'){
-        # Using random walks
-        fc <- cluster_walktrap(graph)
-        V(graph)$community <- fc$membership #membership(fc)
-      }
-      # Visualize the communities
-      nodes <- data.frame(id = V(graph)$name, title = V(graph)$name, group = V(graph)$community)
-      nodes <- nodes[order(nodes$id, decreasing = F),]
+      # Edge coloring and visualization
+      edges <- get.data.frame(graph, what="edges")[1:2]
+      # edges$color <- rep("lightgrey",length(edges$from))
+      # Orginical red and blue
+      edges$color <- df$Distance;
+      
+      edges$color[edges$color < 0] <- "#6b7ab595" #  "#405191" # BLUE
+      edges$color[edges$color > 0] <- "#cc505295"   # "#C7535595" #"#d46e6e" # "#C75355" # "#C81E17" # RED
+      
+      edges$value <- abs(df$Distance)
+      edges$dashes <- df$in_epidem; edges$dashes <- tolower(as.character(df$in_epidem))
+      edges$dashes[edges$dashes == 'false'] <- "[6,0]"
+      edges$dashes[edges$dashes == 'true'] <- "[6,15]"
+      # visNetwork(nodes, edges)
+      # edges$dashes = df$in_epidem   # dashes / shadow ; to invert: !df$in_epidem
+      # edges$dashes = c(df$in_epidem, "[5,15]")
+      # edges$dashes = c("[6,15]") # Todo dashed
+      # edges$dashes = list("[6,15]",df$in_epidem) # No funciona
+      # paste(df$in_epidem,"[5,15]",sep=",")
+      
+      # edges <- data.frame(from = c(1,2), to = c(1,3),dashes = c("[10,10,2,2]", "[2]"))
+      
+      visNetwork(nodes, edges) %>%
+        visExport() %>%
+        visOptions(highlightNearest = list(enabled=TRUE, degree=1,algorithm="hierarchical",labelOnly=FALSE), 
+                   nodesIdSelection = list(enabled=TRUE, main="Highlight a node")) %>%   # list(enabled=TRUE, selected="BreastCancer")
+        visIgraphLayout() %>%
+        visInteraction(multiselect = T) %>%
+        # visLegend() %>%
+        # visLegend(position="right", main="Group") %>% # legend community detection
+        # visEdges(shadow=list(color="#FFFAB5")) %>%
+        visEvents(select = "function(nodes) {
+            Shiny.onInputChange('current_node_id', nodes.nodes);
+            ;}")
       
     }
     
-    # Edge coloring and visualization
-    edges <- get.data.frame(graph, what="edges")[1:2]
-    # edges$color <- rep("lightgrey",length(edges$from))
-    # Orginical red and blue
-    edges$color <- df$Distance;
-   
-    edges$color[edges$color < 0] <- "#6b7ab595" #  "#405191" # BLUE
-    edges$color[edges$color > 0] <- "#cc505295"   # "#C7535595" #"#d46e6e" # "#C75355" # "#C81E17" # RED
-    
-    edges$value <- abs(df$Distance)
-    edges$dashes <- df$in_epidem; edges$dashes <- tolower(as.character(df$in_epidem))
-    edges$dashes[edges$dashes == 'false'] <- "[6,0]"
-    edges$dashes[edges$dashes == 'true'] <- "[6,15]"
-    # visNetwork(nodes, edges)
-    # edges$dashes = df$in_epidem   # dashes / shadow ; to invert: !df$in_epidem
-    # edges$dashes = c(df$in_epidem, "[5,15]")
-    # edges$dashes = c("[6,15]") # Todo dashed
-    # edges$dashes = list("[6,15]",df$in_epidem) # No funciona
-      # paste(df$in_epidem,"[5,15]",sep=",")
-    
-    # edges <- data.frame(from = c(1,2), to = c(1,3),dashes = c("[10,10,2,2]", "[2]"))
-    
-    visNetwork(nodes, edges) %>%
-      visExport() %>%
-      visOptions(highlightNearest = list(enabled=TRUE, degree=1,algorithm="hierarchical",labelOnly=FALSE), 
-                 nodesIdSelection = list(enabled=TRUE, main="Highlight a node")) %>%   # list(enabled=TRUE, selected="BreastCancer")
-      visIgraphLayout() %>%
-      visInteraction(multiselect = T) %>%
-      # visLegend() %>%
-      # visLegend(position="right", main="Group") %>% # legend community detection
-      # visEdges(shadow=list(color="#FFFAB5")) %>%
-      visEvents(select = "function(nodes) {
-            Shiny.onInputChange('current_node_id', nodes.nodes);
-            ;}")
   })
   # observeEvent(input$current_node_id, {
   #   visNetworkProxy("net_plot") %>%
@@ -478,6 +591,11 @@ server <- function(input, output) {
   # PRO TABLE
   output$net_dt_table <- renderDT({
     df <- read.csv(input$net_choice,header=T, sep="\t",stringsAsFactors = F)
+    if(input$net_choice == "final_pairwise_union_spearman_distance_sDEGs_network.txt"){
+      genespathsdic = readRDS("additional_data/DSN_genes_pathways_dics.rds")
+    }else{
+      genespathsdic = readRDS("additional_data/SSN_genes_pathways_dics.rds")
+    }
     df$Dis1 <- str_trim(df$Dis1); df$Dis2 <- str_trim(df$Dis2)
     if(input$pos_neg_interactions == 'pos'){ # POS / NEG INTERACTIONS
       # Selecting only positive interactions
@@ -485,6 +603,12 @@ server <- function(input, output) {
     }else if(input$pos_neg_interactions == 'neg'){
       # Selecting only negative interactions
       df <- df[df$Distance < 0,]
+    }
+    # Backbone
+    if(input$filt_backbone == 'Metric'){
+      df <- df[df$is_metric == TRUE,]
+    }else if(input$filt_backbone == 'Ultra-metric'){
+      df <- df[df$is_ultrametric == TRUE,]
     }
     df <- df[((abs(df$Distance) >= input$corr_slider[1]) & (abs(df$Distance) <= input$corr_slider[2])), ]
     if(!is.null(input$filt_network_node)){
@@ -507,23 +631,56 @@ server <- function(input, output) {
         df <- df[(((df$Dis1 == df$Corr_Dis1) & (df$Dis2 == df$Corr_Dis2)) | ((df$Dis1 != df$Corr_Dis1) & (df$Dis2 != df$Corr_Dis2))), ] # quedarme con las que son dd o mm
       }
     }
-    # if(!is.null(input$filt_network_node)){
-    #   df <- df[(df$Dis1 %in% input$filt_network_node | df$Dis2 %in% input$filt_network_node),]
-    # }
-    df <- df[, c("Dis1","Dis2","Distance", "pvalue", "adj_pvalue", "in_epidem")]
-    df$Distance <- round(df$Distance, 4)
-    df$pvalue <- formatC(df$pvalue, format = "e", digits = 2); df$adj_pvalue <- formatC(df$adj_pvalue, format = "e", digits = 2)
-    if(is.null(input$net_plot_selected) | input$net_plot_selected == ''){
-      colnames(df) <- c("Disease 1", "Disease 2","Spearman's correlation", "p-value", "adj.p-value", "In epidemiology")
-      df
-    }else{
-      filtered <- df[(df$Dis1 == input$net_plot_selected | df$Dis2 == input$net_plot_selected),]
-      # filtered <- df[(df$Dis1 == input$networkid_selected | df$Dis2 == input$networkid_selected),]
-      # df %>%
-      # filter((Dis1 == input$dis_choice | Dis2 == input$dis_choice))
-      colnames(filtered) <- c("Disease 1", "Disease 2","Spearman's correlation", "p-value", "adj.p-value", "In epidemiology")
-      filtered
+    
+    # Filtering pairs based on selected genes and pathways
+    gene_pairs = c()
+    if(!is.null(input$filt_network_genes)){
+      for(gene in input$filt_network_genes){
+        if(input$genespaths_direction == "all"){
+          gene_pairs = append(gene_pairs, union(genespathsdic$genesdf[[gene]]$up, genespathsdic$genesdf[[gene]]$down))
+        }else if(input$genespaths_direction == 'up'){
+          gene_pairs = append(gene_pairs, genespathsdic$genesdf[[gene]]$up)
+        }else{  # down
+          gene_pairs = append(gene_pairs, genespathsdic$genesdf[[gene]]$down)
+        }
+      }
     }
+    path_pairs = c()
+    if(!is.null(input$filt_network_pathways)){
+      for(path in input$filt_network_pathways){
+        if(input$genespaths_direction == "all"){
+          path_pairs = append(path_pairs, union(genespathsdic$pathwaysdf[[path]]$up, genespathsdic$pathwaysdf[[path]]$down))
+        }else if(input$genespaths_direction == 'up'){
+          path_pairs = append(path_pairs, genespathsdic$pathwaysdf[[path]]$up)
+        }else{  # down
+          path_pairs = append(path_pairs, genespathsdic$pathwaysdf[[path]]$down)
+        }
+      }
+    }
+    # Select the union of interactions in genes and pathways
+    if(!is.null(input$filt_network_genes) | !is.null(input$filt_network_pathways)){
+      selected_pairs = union(gene_pairs, path_pairs)
+      # print(selected_pairs)
+      df <- df[df$id %in% selected_pairs,]
+    }
+    
+    if(nrow(df) > 0){
+      df <- df[, c("Dis1","Dis2","Distance", "pvalue", "adj_pvalue", "in_epidem")]
+      df$Distance <- round(df$Distance, 4)
+      df$pvalue <- formatC(df$pvalue, format = "e", digits = 2); df$adj_pvalue <- formatC(df$adj_pvalue, format = "e", digits = 2)
+      if(is.null(input$net_plot_selected) | input$net_plot_selected == ''){
+        colnames(df) <- c("Disease 1", "Disease 2","Spearman's correlation", "p-value", "adj.p-value", "In epidemiology")
+        df
+      }else{
+        filtered <- df[(df$Dis1 == input$net_plot_selected | df$Dis2 == input$net_plot_selected),]
+        # filtered <- df[(df$Dis1 == input$networkid_selected | df$Dis2 == input$networkid_selected),]
+        # df %>%
+        # filter((Dis1 == input$dis_choice | Dis2 == input$dis_choice))
+        colnames(filtered) <- c("Disease 1", "Disease 2","Spearman's correlation", "p-value", "adj.p-value", "In epidemiology")
+        filtered
+      }
+    }
+    
     
   })
   
