@@ -23,7 +23,7 @@ library(shinythemes)
 # options(repos = BiocManager::repositories())
 
 # To share the library
-library(rsconnect)
+# library(rsconnect)
 # rsconnect::deployApp('/home/beatriz/Desktop/ANALYSIS/shiny_network_app')
 
 # net_filename <- 'final_pairwise_union_spearman_distance_sDEGs_network.txt'
