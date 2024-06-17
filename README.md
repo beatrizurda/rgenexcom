@@ -38,6 +38,8 @@ rgenexcom is a web application that allows for both detailed studies on the mole
 Link to rgenexcom: <a href="http://disease-perception.bsc.es/rgenexcom/">http://disease-perception.bsc.es/rgenexcom/</a>
 
 ![Captura de pantalla 2021-07-29 a las 17 20 21](https://user-images.githubusercontent.com/46993728/127520385-61bf4b87-7910-4069-babe-4c7557e39a11.png)
+![image](https://github.com/bsc-life/rgenexcom/assets/46993728/5f43d446-fcfc-45e1-897d-64dea50095bc)
+
 
 
 ## Paper
