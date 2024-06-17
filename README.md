@@ -20,7 +20,12 @@ Web application for the manuscript <a href="https://doi.org/10.1101/2021.07.22.2
     <li>
       <a href="#paper">Paper</a>
     </li>
-    <li><a href="#documentarion">Documentation</a></li>
+    <li>
+      <a href="#documentarion">Documentation</a>
+    </li>
+    <li>
+      <a href="#tutorial">Tutorial</a>
+    </li>
   </ol>
 </details>
 
@@ -82,5 +87,7 @@ In this section you can access the differentially expressed genes and pathways i
 If you select one phenotype, you will get the table of dysregulated genes and pathways for that phenotype. You can filter the tables by selecting only the features that are significantly altered or by selecting only the over or underexpressed features.
 If you only select two or more phenotypes, you will get the genes or pathways that are significantly altered in all those phenotypes. Again, you can select only the over or the underexpressed features.
 
+## Tutorial
+Download the tutorial of the web application ()
 
 
