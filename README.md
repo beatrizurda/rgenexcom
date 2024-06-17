@@ -88,6 +88,6 @@ If you select one phenotype, you will get the table of dysregulated genes and pa
 If you only select two or more phenotypes, you will get the genes or pathways that are significantly altered in all those phenotypes. Again, you can select only the over or the underexpressed features.
 
 ## Tutorial
-Download the tutorial of the web application [Download PDF](https://github.com/bsc-life/rgenexcom/rgenexcom_tutorial.pdf)
+Download the tutorial of the web application [Download PDF](rgenexcom_tutorial.pdf)
 
 
